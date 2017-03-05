@@ -26,5 +26,5 @@ library
   exposed-modules: Faceted
   other-modules: Faceted.Internal, Faceted.FIORef, Faceted.FHandle, Faceted.Pure
   hs-source-dirs: .
-  build-depends: base ==4.6.*,
-                 free >=4.6
+  build-depends: base ==4.7.*,
+                 free >=4.7

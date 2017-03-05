@@ -27,14 +27,14 @@ import Data.Dynamic
 -- combination of the type system and dynamic checks.
 type Label = String
 
--- | A _view_ is any set of labels. 
+-- | A _view_ is any set of labels.
 -- In enforcing information flow security Each view may see a different value.
 type View = [Label]
 
 -- | Type 'Faceted a' represents (possibly) faceted values.
 --
--- <k ? x : y>   ====>  Faceted k x y 
- 
+-- <k ? x : y>   ====>  Faceted k x y
+
 {-
 data Faceted a =
     Raw a
@@ -65,7 +65,7 @@ instance Applicative Faceted where
   Bottom <*> x  =  Bottom
 
 -- | Monad: Like applicative, but even more powerful. 'Faceted' the free monad
--- over the function 'Facets a = F Label a a | B'. 
+-- over the function 'Facets a = F Label a a | B'.
 instance Monad Faceted where
   return x = Raw x
 --  (>>=) = flip ((.) Join . fmap)
@@ -129,6 +129,13 @@ visibleTo pc view = all consistent pc
 
 -- | Faceted IO
 data FIO a = FIO { runFIO :: PC -> IO a }
+
+instance Functor FIO where
+  fmap = liftM
+
+instance Applicative FIO where
+  pure = return
+  (<*>) = ap
 
 -- | Monad is straightforward
 instance Monad FIO where

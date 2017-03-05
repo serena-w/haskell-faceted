@@ -71,3 +71,7 @@ main_m = do
 n = 2
 main = do
   main_x1
+  main_x2
+  main_y
+  main_z
+  main_m

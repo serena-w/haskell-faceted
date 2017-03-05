@@ -8,6 +8,7 @@ module Faceted.FHandle (
   hGetCharF,
   hCloseF,
   hPutStrF,
+  hPutIntF,
   ) where
 
 import Faceted.Internal
@@ -20,7 +21,7 @@ import Faceted.FIO(swap)
 
 -- | Facet-aware file handles
 data FHandle = FHandle View Handle
- 
+
 openFileF :: View -> FilePath -> IOMode -> FIO FHandle
 openFileF view path mode = FIO $ \_ ->
   do putStrLn "opening a file"
@@ -43,7 +44,6 @@ hPutCharF (FHandle view handle) ch = FIO f where
   f :: PC -> IO ()
   f pc | pc `visibleTo` view = case project view (runFaceted ch pc) of
                                  Just c -> do
-                                   putStrLn $ "printing " ++ show c
                                    hPutChar handle c
                                  Nothing -> return ()
        | otherwise           = return ()
@@ -57,3 +57,13 @@ hPutStrF h fs = do
     s <- fs
     return $ liftM return $ sequence $ map (hPutCharF h . return) s
   return ()
+
+hPutIntF :: FHandle -> Faceted Int -> FIO ()
+hPutIntF (FHandle view handle) i = FIO f where
+  f :: PC -> IO ()
+  f pc | pc `visibleTo` view = case project view (runFaceted i pc) of
+                                 Just c -> do
+                                   hPutStr handle (show c)
+                                 Nothing -> return ()
+       | otherwise           = return ()
+
