@@ -9,6 +9,7 @@ module Faceted.FHandle (
   hCloseF,
   hPutStrF,
   hPutIntF,
+  evalStrF,
   ) where
 
 import Faceted.Internal
@@ -51,6 +52,14 @@ hPutCharF (FHandle view handle) ch = FIO f where
 prod = liftM join . swap
 
 -- For convenience
+evalStrF :: View -> Faceted [Char] -> FIO [Char]
+evalStrF view ch = FIO f where
+  f :: PC -> IO [Char]
+  f pc | pc `visibleTo` view = case project view (runFaceted ch pc) of
+                                 Just s -> return s
+                                 Nothing -> return ""
+       | otherwise           = return ""
+
 hPutStrF :: FHandle -> Faceted String -> FIO ()
 hPutStrF h fs = do
   prod $ do
