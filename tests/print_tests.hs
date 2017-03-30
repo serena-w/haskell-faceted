@@ -42,10 +42,20 @@ main5 = flip runFIO [] $ do
   hPutIntF h addF
   hCloseF h
 
+e3 = do x <- (makeFacets "l" 1 10)
+        y <- (makeFacets "l" 100 1000)
+        return (x + y)
+
+main6 = flip runFIO [] $ do
+  h <- openFileF [] "output.txt" AppendMode
+  hPutStrF h (makePublic "\nTest 6: view with no labels\n")
+  hPutIntF h e3
+  hCloseF h
+
 main = do
   main1
   main2
   main3
   main4
   main5
-
+  main6

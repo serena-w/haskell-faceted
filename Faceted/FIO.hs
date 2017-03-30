@@ -4,7 +4,9 @@ module Faceted.FIO (
   FIO,
   runFIO,
   swap,
-  primitive
+  primitive,
+  evalStrF,
+  evalIntF,
 ) where
 
 import Faceted.Internal
@@ -35,3 +37,20 @@ primitive = FIO $ \pc ->
 
 swap :: Faceted (FIO a) -> FIO (Faceted a)
 swap = prod . liftM (liftM return)
+
+evalStrF :: View -> Faceted [Char] -> FIO [Char]
+evalStrF view ch = FIO f where
+  f :: PC -> IO [Char]
+  f pc | pc `visibleTo` view = case project view (runFaceted ch pc) of
+                                 Just s -> return s
+                                 Nothing -> return "" -- default value for strings
+       | otherwise           = return ""
+
+evalIntF :: View -> Faceted Int -> FIO Int
+evalIntF view i = FIO f where
+  f :: PC -> IO Int
+  f pc | pc `visibleTo` view = case project view (runFaceted i pc) of
+                                 Just v -> return v
+                                 Nothing -> return 0 -- default value for ints
+       | otherwise           = return 0
+
