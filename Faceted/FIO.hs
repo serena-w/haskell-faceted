@@ -7,6 +7,7 @@ module Faceted.FIO (
   primitive,
   evalStrF,
   evalIntF,
+  evalIntP,
 ) where
 
 import Faceted.Internal
@@ -54,3 +55,12 @@ evalIntF view i = FIO f where
                                  Nothing -> return 0 -- default value for ints
        | otherwise           = return 0
 
+evalIntP :: ExtView -> PolicyEnv -> Faceted Int -> FIO Int
+evalIntP view env i =
+  let intView = getView view env
+      f :: PC -> IO Int
+      f pc | pc `visibleTo` intView = case projectExt view env (runFaceted i pc) of
+                                 Just v -> return v
+                                 Nothing -> return 0 -- default value for ints
+       | otherwise           = return 0
+  in FIO f

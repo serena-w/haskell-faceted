@@ -6,12 +6,16 @@ module Faceted.Internal(
   PC,
   Branch(Private,Public),
   View,
+  ExtView,
+  PolicyEnv,
   FIO(FIO),
   runFIO,
   pcF,
   project,
+  projectExt,
   visibleTo,
   runFaceted,
+  getView,
   ) where
 
 import Control.Applicative
@@ -20,6 +24,8 @@ import Data.IORef
 import Data.List
 import System.IO
 import Data.Dynamic
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 -- | A security label is any string.
 -- Labels need not be secrets; they
@@ -30,6 +36,9 @@ type Label = String
 -- | A _view_ is any set of labels.
 -- In enforcing information flow security Each view may see a different value.
 type View = [Label]
+
+type ExtView = String
+type PolicyEnv = Map Label (ExtView -> Bool)
 
 -- | Type 'Faceted a' represents (possibly) faceted values.
 --
@@ -120,12 +129,31 @@ runFaceted = f where
     g Bottom = Bottom
   f anythingElse pc = anythingElse
 
+projectExt :: ExtView -> PolicyEnv -> Faceted a -> Maybe a
+projectExt view env Bottom  = Nothing
+projectExt view env (Raw v) = Just v
+projectExt view env (Faceted k priv pub) =
+  if checkPolicy k env
+    then projectExt view env priv
+    else projectExt view env pub
+  where checkPolicy k env = case Map.lookup k env of
+                              Just(policy) -> policy(view)
+                              Nothing -> True
+
 -- Private
 visibleTo :: PC -> View -> Bool
 visibleTo pc view = all consistent pc
   where consistent (Private k) = k `elem` view
         consistent (Public k)  = k `notElem` view
 
+getView :: ExtView -> PolicyEnv -> View
+getView extView env =
+  let (assgns,_) = Map.mapAccumWithKey f [] env
+      view = map (\(l,_) -> l) (filter (\(_,b) -> b) assgns)
+  in view
+  where
+  f :: [(Label,Bool)] -> Label -> (ExtView -> Bool) -> ([(Label,Bool)],())
+  f acc keyL policy = ((keyL,policy(extView)) : acc,())
 
 -- | Faceted IO
 data FIO a = FIO { runFIO :: PC -> IO a }
