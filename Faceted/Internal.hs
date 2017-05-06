@@ -2,7 +2,9 @@
 
 module Faceted.Internal(
   Label,
-  Faceted(Raw,Faceted,Bottom,Bind),
+  CFaceted(Raw,CFaceted,CBottom,CBind),
+  Faceted(Prim,Return,Bind,Bottom),
+  run,
   PC,
   Branch(Private,Public),
   View,
@@ -10,10 +12,13 @@ module Faceted.Internal(
   PolicyEnv,
   FIO(FIO),
   runFIO,
+  pcCF,
   pcF,
+  projectC,
   project,
   projectExt,
   visibleTo,
+  runCFaceted,
   runFaceted,
   getView,
   ) where
@@ -38,7 +43,7 @@ type Label = String
 type View = [Label]
 
 type ExtView = String
-type PolicyEnv = Map Label (ExtView -> Bool)
+type PolicyEnv = Map Label (ExtView -> CFaceted Bool)
 
 -- | Type 'Faceted a' represents (possibly) faceted values.
 --
@@ -53,12 +58,50 @@ data Faceted a =
   deriving (Show, Eq, Typeable)
 -}
 
-data Faceted a where
-  Raw :: a -> Faceted a
-  Faceted :: Label -> Faceted a -> Faceted a -> Faceted a
-  Bottom :: Faceted a
-  Bind :: Faceted a -> (a -> Faceted b) -> Faceted b
+data CFaceted a where
+  Raw :: Eq a => a -> CFaceted a
+  CFaceted :: Eq a => Label -> CFaceted a -> CFaceted a -> CFaceted a
+  CBottom :: Eq a => CFaceted a
+  CBind :: Eq a => CFaceted a -> (a -> CFaceted b) -> CFaceted b
 
+instance Eq (CFaceted a) where
+  (==) (Raw a) (Raw b) = (a==b)
+  (==) (CFaceted k1 priv1 pub1) (CFaceted k2 priv2 pub2) = (k1==k2) && (priv1==priv2) && (pub1==pub2)
+  (==) CBottom CBottom = True
+  (==) _facet1 _facet2 = False -- what about CBind?
+
+fmapC :: (Eq b) => (a -> b) -> CFaceted a -> CFaceted b
+fmapC f (Raw v)               = Raw (f v)
+fmapC f (CFaceted k priv pub) = CFaceted k (fmapC f priv) (fmapC f pub)
+fmapC f CBottom                = CBottom
+
+data Faceted a where
+  Prim   :: (Eq a) => CFaceted a -> Faceted a
+  Return :: a -> Faceted a
+  Bind   :: Faceted a -> (a -> Faceted b) -> Faceted b -- ??????
+  Bottom :: Faceted a -- ?????
+
+run :: (Eq a) => Faceted a -> CFaceted a
+run (Prim fv)            = fv
+run (Return x)           = Raw x
+run (Bottom)             = CBottom
+run (Bind (Prim fv) f)   = CBind fv (run . f) -- ??????
+run (Bind (Return a) f)  = run (f a)
+run (Bind Bottom _)      = CBottom
+run (Bind (Bind ma f) g) = run (Bind ma (\a -> Bind (f a) g))
+
+instance Functor Faceted where
+  fmap = liftM
+
+instance Applicative Faceted where
+  pure  = return
+  (<*>) = ap
+
+instance Monad Faceted where
+  return = Return
+  (>>=)  = Bind
+
+{- old code for when Faceted was not an Eq instance and was a monad itself
 -- | Functor: For when the function is pure but the argument has facets.
 instance Functor Faceted where
   fmap f (Raw v)              = Raw (f v)
@@ -79,12 +122,7 @@ instance Monad Faceted where
   return x = Raw x
 --  (>>=) = flip ((.) Join . fmap)
   (>>=) = Bind
-{-
-  (Raw x)              >>= f  = f x
-  (Faceted k priv pub) >>= f  = Faceted k (priv >>= f) (pub >>= f)
-  Bottom               >>= f  = Bottom
 -}
-
 
 -- | A Branch is a principal or its negatives, and a pc is a set of branches.
 
@@ -93,51 +131,52 @@ type PC = [Branch]
 
 -- | << pc ? x : y >>  =====>   pcF pc x y
 
-pcF :: PC -> Faceted a -> Faceted a -> Faceted a
-pcF []                      x _ = x
-pcF (Private k : branches) x y = Faceted k (pcF branches x y) y
-pcF (Public k  : branches) x y = Faceted k y (pcF branches x y)
+pcCF :: (Eq a) => PC -> CFaceted a -> CFaceted a -> CFaceted a
+pcCF []                     x _ = x
+pcCF (Private k : branches) x y = CFaceted k (pcCF branches x y) y
+pcCF (Public k  : branches) x y = CFaceted k y (pcCF branches x y)
+
+pcF :: (Eq a) => PC -> Faceted a -> Faceted a -> Faceted a
+pcF pc x y = Prim (pcCF pc (run x) (run y))
 
 -- Private
-project :: View -> Faceted a -> Maybe a
-project view Bottom  = Nothing
-project view (Raw v) = Just v
-project view (Faceted k priv pub)
-  | k `elem`    view = project view priv
-  | k `notElem` view = project view pub
-{-
-project view (Bind fa c) = do
-  a <- project view fa
-  project view (c a)
--}
-{-
-project view (Join ffa) = do
-  fa <- project view ffa
-  project view fa
--}
+projectC :: (Eq a) => View -> CFaceted a -> Maybe a
+projectC view CBottom  = Nothing
+projectC view (Raw v) = Just v
+projectC view (CFaceted k priv pub)
+  | k `elem`    view  = projectC view priv
+  | k `notElem` view  = projectC view pub
 
-runFaceted :: Faceted a -> PC -> Faceted a
-runFaceted = f where
-  f :: Faceted a -> PC -> Faceted a
-  f (Bind ua c) pc = g (f ua pc) where
+project :: (Eq a) => View -> Faceted a -> Maybe a
+project view = (projectC view) . run
+
+runCFaceted :: (Eq a) => CFaceted a -> PC -> CFaceted a
+runCFaceted = f where
+  f :: (Eq a) => CFaceted a -> PC -> CFaceted a
+  f (CBind ua c) pc = g (f ua pc) where
     g (Raw a) = f (c a) pc
-    g (Faceted k ua1 ua2)
-        | Private k `elem` pc = f (Bind ua1 c) pc
-        | Public k  `elem` pc = f (Bind ua2 c) pc
-        | otherwise           = Faceted k (f (Bind ua1 c) (Private k : pc))
-                                          (f (Bind ua2 c) (Public k : pc))
-    g Bottom = Bottom
+    g (CFaceted k ua1 ua2)
+        | Private k `elem` pc = f (CBind ua1 c) pc
+        | Public k  `elem` pc = f (CBind ua2 c) pc
+        | otherwise           = CFaceted k (f (CBind ua1 c) (Private k : pc))
+                                           (f (CBind ua2 c) (Public k : pc))
+    g CBottom = CBottom
   f anythingElse pc = anythingElse
 
-projectExt :: ExtView -> PolicyEnv -> Faceted a -> Maybe a
-projectExt view env Bottom  = Nothing
+runFaceted :: (Eq a) => Faceted a -> PC -> Faceted a
+runFaceted x pc = Prim (runCFaceted (run x) pc)
+
+projectExt :: ExtView -> PolicyEnv -> CFaceted a -> Maybe a
+projectExt view env CBottom  = Nothing
 projectExt view env (Raw v) = Just v
-projectExt view env (Faceted k priv pub) =
+projectExt view env (CFaceted k priv pub) =
   if checkPolicy k env
     then projectExt view env priv
     else projectExt view env pub
   where checkPolicy k env = case Map.lookup k env of
-                              Just(policy) -> policy(view)
+                              Just(policy) -> case policy(view) of
+                                                Raw b -> b
+                                                anythingelse -> False -- TODO CHANGE!!
                               Nothing -> True
 
 -- Private
@@ -148,12 +187,15 @@ visibleTo pc view = all consistent pc
 
 getView :: ExtView -> PolicyEnv -> View
 getView extView env =
-  let (assgns,_) = Map.mapAccumWithKey f [] env
-      view = map (\(l,_) -> l) (filter (\(_,b) -> b) assgns)
+  let (assgns,_) = Map.mapAccumWithKey accumF [] env
+      view = map (\(l,_) -> l) (filter (\(_,b) -> filterF b) assgns)
   in view
   where
-  f :: [(Label,Bool)] -> Label -> (ExtView -> Bool) -> ([(Label,Bool)],())
-  f acc keyL policy = ((keyL,policy(extView)) : acc,())
+  accumF :: [(Label,CFaceted Bool)] -> Label -> (ExtView -> CFaceted Bool) -> ([(Label,CFaceted Bool)],())
+  accumF acc keyL policy = ((keyL,policy(extView)) : acc,())
+  filterF :: CFaceted Bool -> Bool
+  filterF (Raw b) = b
+  filterF anythingElse = False -- TODO CHANGE!!
 
 -- | Faceted IO
 data FIO a = FIO { runFIO :: PC -> IO a }

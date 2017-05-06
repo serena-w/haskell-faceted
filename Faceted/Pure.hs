@@ -5,7 +5,6 @@ module Faceted.Pure (
   Faceted,
   makePrivate,
   makeFacets,
-  makeFaceted,
   makePublic,
   bottom
   ) where
@@ -14,18 +13,18 @@ import Faceted.Internal
 
 import Control.Applicative
 
-bottom = Bottom
+bottom :: (Eq a) => Faceted a
+bottom = Prim (CBottom)
 
 -- | < k ? x : bottom >   ====>  makePrivate k x
 
-makePrivate :: Label -> a -> Faceted a
-makePrivate k x = Faceted k (Raw x) (bottom)
+makePrivate :: (Eq a) => Label -> a -> Faceted a
+makePrivate k x = Prim (CFaceted k (Raw x) (CBottom))
 
-makeFacets k x y = Faceted k (Raw x) (Raw y)
+makeFacets :: (Eq a) => Label -> a -> a -> Faceted a
+makeFacets k x y = Prim (CFaceted k (Raw x) (Raw y))
 
 -- | x ==> Raw x ===> makePublic x
 
-makePublic :: a -> Faceted a
-makePublic x = Raw x
-
-makeFaceted = Faceted
+makePublic :: (Eq a) => a -> Faceted a
+makePublic x = Prim (Raw x)

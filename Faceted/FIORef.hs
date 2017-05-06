@@ -15,7 +15,7 @@ import Data.IORef
 data FIORef a = FIORef (IORef a)
 
 -- | Allocate a new 'FIORef'
-newFIORef :: Faceted a -> FIO (FIORef (Faceted a))
+newFIORef :: (Eq a) => Faceted a -> FIO (FIORef (Faceted a))
 newFIORef init = FIO newFIORefForPC
   where newFIORefForPC pc = do
         putStrLn "Making new IORef"
@@ -23,15 +23,15 @@ newFIORef init = FIO newFIORefForPC
         return (FIORef var)
 
 -- | Read an 'FIORef'
-readFIORef :: FIORef (Faceted a) -> FIO (Faceted a)
+readFIORef :: (Eq a) => FIORef (Faceted a) -> FIO (Faceted a)
 readFIORef (FIORef var) = FIO readFIORefForPC
   where readFIORefForPC pc = do
         putStrLn "Reading an IORef"
         faceted <- readIORef var
-        return faceted 
+        return faceted
 
 -- | Write an 'FIORef'
-writeFIORef :: FIORef (Faceted a) -> Faceted a -> FIO (Faceted ())
+writeFIORef :: (Eq a) => FIORef (Faceted a) -> Faceted a -> FIO (Faceted ())
 writeFIORef (FIORef var) newValue = FIO writeFIORefForPC
   where writeFIORefForPC pc = do
         putStrLn "Writing an IORef"

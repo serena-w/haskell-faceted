@@ -9,6 +9,7 @@ maintainer:          kenn@kennknowles.com
 category:            Security
 build-type:          Simple
 cabal-version:       >=1.8
+extensions: ScopedTypedVariables
 description:
   This library provides faceted values and computations for
   enforcing secure information flow.
