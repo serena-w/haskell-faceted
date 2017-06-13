@@ -3,8 +3,8 @@
 module Faceted.FIO (
   FIO,
   runFIO,
-  swap,
-  primitive,
+  -- swap,
+  -- primitive,
   evalStrF,
   evalIntF,
   evalStrP,
@@ -18,7 +18,7 @@ import Control.Monad(liftM)
 -- | With an empty context it is safe to run
 secureRunFIO fio = runFIO fio []
 
-prod :: (Eq a) => Faceted (FIO (Faceted a)) -> FIO (Faceted a)
+{-prod :: (Eq a) => Faceted (FIO (Faceted a)) -> FIO (Faceted a)
 prod ua = FIO f where
   f pc = g (run (runFaceted ua pc)) where
     g :: (Eq a) => CFaceted (FIO (Faceted a)) -> IO (Faceted a)
@@ -39,7 +39,7 @@ primitive = FIO $ \pc ->
   in result
 
 swap :: (Eq a) => Faceted (FIO a) -> FIO (Faceted a)
-swap = prod . liftM (liftM return)
+swap = prod . liftM (liftM return)-}
 
 evalStrF :: View -> Faceted [Char] -> FIO [Char]
 evalStrF view ch = FIO f where

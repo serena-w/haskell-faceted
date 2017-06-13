@@ -2,7 +2,7 @@
 
 import Test.HUnit
 import Faceted
-import Faceted.FIO(swap)
+-- import Faceted.FIO(swap)
 import Control.Monad(liftM, join)
 import Data.IORef
 import Data.Map (Map)
@@ -12,7 +12,7 @@ import qualified System.Exit as Exit
 catF = do x <- (makePrivate "k" "abc")
           y <- (makePrivate "l" "def")
           return (x ++ y)
-policyEnv1 = Map.fromList [("l",(\s -> makePublic $ s == "Alice"))]
+policyEnv1 = Map.fromList [("l",(\s -> run (makePublic $ s == "Alice")))]
 
 test0 = TestCase (assertEqual "for (1+2)," (3) (1+2))
 test1 = TestCase (do s <- runFIO (evalStrF [] catF) []
@@ -23,8 +23,8 @@ testP1 = TestCase (do s <- runFIO (evalStrP "Alice" policyEnv1 catF) []
                       assertEqual "<k ? \"abc\" : bot> ++ <l ? \"def\"), viewing as Alice" s "abcdef")
 
 e1 = makeFacets "l" 1 2
-policyEnv2 = Map.fromList [("l",(\s -> makePublic True))]
-policyEnv3 = Map.fromList [("l",(\s -> makePublic False))]
+policyEnv2 = Map.fromList [("l",(\s -> run (makePublic True)))]
+policyEnv3 = Map.fromList [("l",(\s -> run (makePublic False)))]
 
 e1Test0 = TestCase (do i <- runFIO (evalIntF [] e1) []
                        assertEqual "<l ? 1 : 2>, view with no labels" i 2)
@@ -66,9 +66,9 @@ e3Test2 = TestCase (do i <- runFIO (evalIntF ["l1"] e3) []
 e4 = do x <- (makeFacets "l1" 1 10)
         y <- (makeFacets "l2" 100 1000)
         return (x + y)
-policyEnv4 = Map.fromList [("l1",(\s -> makePublic $ s == "Alice")),("l2",(\s -> makePublic $ s == "Alice"))]
-policyEnv5 = Map.fromList [("l1",(\s -> makePublic $ s == "Alice")),("l2",(\s -> makePublic $ s == "Bob"))]
-policyEnv6 = Map.fromList [("l1",(\s -> makePublic $ s == "Alice")),("l2",(\s -> makePublic $ s == "Bob")),("l3",(\s -> makePublic True))]
+policyEnv4 = Map.fromList [("l1",(\s -> run (makePublic $ s == "Alice"))),("l2",(\s -> run (makePublic $ s == "Alice")))]
+policyEnv5 = Map.fromList [("l1",(\s -> run (makePublic $ s == "Alice"))),("l2",(\s -> run (makePublic $ s == "Bob")))]
+policyEnv6 = Map.fromList [("l1",(\s -> run (makePublic $ s == "Alice"))),("l2",(\s -> run (makePublic $ s == "Bob"))),("l3",(\s -> run (makePublic True)))]
 e4Test0 = TestCase (do i <- runFIO (evalIntF [] e4) []
                        assertEqual "<l1 ? 1 : 10> + <l2 ? 100 : 1000>, view with no labels" i 1010)
 e4Test1 = TestCase (do i <- runFIO (evalIntF ["l1"] e4) []
@@ -101,7 +101,7 @@ e4TestP5 = TestCase (do i <- runFIO (evalIntP "Bob" policyEnv1 e4) []
 e5 = do x <- (makeFacets "l1" 1 10)
         y <- (makeFacets "l2" 100 1000)
         return (if (x == 1) then 1 else y)
-policyEnv7 = Map.fromList [("l1",(\s -> makePublic $ s == "Bob")),("l2",(\s -> makePublic $ s == "Alice"))]
+policyEnv7 = Map.fromList [("l1",(\s -> run (makePublic $ s == "Bob"))),("l2",(\s -> run (makePublic $ s == "Alice")))]
 
 e5TestP1 = TestCase (do i <- runFIO (evalIntP "Alice" policyEnv4 e5) []
                         assertEqual "if <l1 ? 1 : 10> == 1 then 1 else <l2 ? 100 : 1000>, viewing as Alice" i 1)
@@ -119,7 +119,7 @@ secret = return (makePrivate "l" 42)
 e6 :: FIO(Faceted Int)
 e6 = do (do (v :: Faceted Int) <- secret
             xRef <- x
-            if v == (return 42)
+            if (run v) == (run (return 42))
               then writeFIORef xRef (return 1)
               else return (return ()))
         readFIORef undefined --liftM readFIORef xRef
